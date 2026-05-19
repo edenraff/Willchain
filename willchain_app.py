@@ -121,10 +121,21 @@ st.markdown("""
 # ─── Session State Init ──────────────────────────────────────────
 if "wallet_connected" not in st.session_state:
     st.session_state.wallet_connected = False
-if "last_ping" not in st.session_state:
-    st.session_state.last_ping = datetime.now() - timedelta(days=12)
-if "grace_period" not in st.session_state:
-    st.session_state.grace_period = 90
+if "vault_items" not in st.session_state:
+    st.session_state.vault_items = [
+        {"category": "📧 Email", "name": "Gmail", "username": "jean.martin@gmail.com", "note": "Main email account", "encrypted": True},
+        {"category": "🎬 Streaming", "name": "Netflix", "username": "jean.martin@gmail.com", "note": "Family plan", "encrypted": True},
+        {"category": "☁️ Cloud Storage", "name": "iCloud", "username": "jean.martin@icloud.com", "note": "Contains family photos", "encrypted": True},
+        {"category": "🏦 Finance", "name": "Revolut", "username": "jean.martin@gmail.com", "note": "Secondary bank account", "encrypted": True},
+        {"category": "🎮 Gaming", "name": "Steam", "username": "jeanmartin_gamer", "note": "Library of 200+ games", "encrypted": True},
+    ]
+
+if "certificate_uploaded" not in st.session_state:
+    st.session_state.certificate_uploaded = False
+if "certificate_hash" not in st.session_state:
+    st.session_state.certificate_hash = None
+if "certificate_verified" not in st.session_state:
+    st.session_state.certificate_verified = False
 if "heirs" not in st.session_state:
     st.session_state.heirs = [
         {"name": "Alice Dupont", "address": "0xA1b2...C3d4", "pct": 50, "relation": "Spouse"},
@@ -137,10 +148,7 @@ if "assets" not in st.session_state:
         {"token": "MATIC", "amount": 1500, "value_usd": 1200},
         {"token": "USDC", "amount": 3000, "value_usd": 3000},
     ]
-if "ping_log" not in st.session_state:
-    st.session_state.ping_log = [
-        datetime.now() - timedelta(days=d) for d in [12, 42, 73, 105, 135]
-    ]
+
 if "will_active" not in st.session_state:
     st.session_state.will_active = True
 if "simulation_triggered" not in st.session_state:
@@ -175,7 +183,8 @@ with st.sidebar:
         "📝 My Will",
         "👥 Heirs",
         "💰 Assets",
-        "🔔 Alive Signal",
+        "🔐 Digital Vault",
+        "📜 Death Certificate",
         "🔬 Smart Contract",
         "🎭 Demo Simulator",
     ], label_visibility="collapsed")
@@ -196,31 +205,28 @@ if not st.session_state.wallet_connected:
 
 # ── DASHBOARD ────────────────────────────────────────────────────
 if page == "🏠 Dashboard":
-    days_since_ping = (datetime.now() - st.session_state.last_ping).days
-    days_remaining = st.session_state.grace_period - days_since_ping
-    pct_elapsed = min(days_since_ping / st.session_state.grace_period, 1.0)
     total_value = sum(a["value_usd"] for a in st.session_state.assets)
 
     # Status banner
-    if days_remaining > 30:
-        status_html = '<span class="status-active">🟢 WILL ACTIVE — Safe</span>'
-    elif days_remaining > 7:
-        status_html = '<span class="status-warning">🟡 PING REQUIRED SOON</span>'
+    if st.session_state.certificate_verified:
+        status_html = '<span class="status-danger">🔴 DEATH CERTIFICATE VERIFIED — Transfer executing</span>'
+    elif st.session_state.certificate_uploaded:
+        status_html = '<span class="status-warning">🟡 CERTIFICATE PENDING VERIFICATION</span>'
     else:
-        status_html = '<span class="status-danger">🔴 CRITICAL — Trigger Imminent</span>'
+        status_html = '<span class="status-active">🟢 WILL ACTIVE — Waiting for death certificate</span>'
 
     st.markdown(f"### Will Status &nbsp; {status_html}", unsafe_allow_html=True)
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(f"""<div class="metric-card">
-          <div class="metric-value">{days_remaining}d</div>
-          <div class="metric-label">Days until trigger</div>
+          <div class="metric-value">{'✅' if st.session_state.certificate_verified else '⏳'}</div>
+          <div class="metric-label">Certificate status</div>
         </div>""", unsafe_allow_html=True)
     with col2:
         st.markdown(f"""<div class="metric-card">
           <div class="metric-value">${total_value:,.0f}</div>
-          <div class="metric-label">Total assets registered</div>
+          <div class="metric-label">Total crypto assets</div>
         </div>""", unsafe_allow_html=True)
     with col3:
         st.markdown(f"""<div class="metric-card">
@@ -229,17 +235,32 @@ if page == "🏠 Dashboard":
         </div>""", unsafe_allow_html=True)
     with col4:
         st.markdown(f"""<div class="metric-card">
-          <div class="metric-value">{days_since_ping}d</div>
-          <div class="metric-label">Since last ping</div>
+          <div class="metric-value">{len(st.session_state.vault_items)}</div>
+          <div class="metric-label">Digital accounts secured</div>
         </div>""", unsafe_allow_html=True)
 
-    # Progress bar
-    st.markdown("#### ⏱️ Grace Period Progress")
-    progress_color = "normal" if pct_elapsed < 0.7 else ("warning" if pct_elapsed < 0.9 else "error")
-    st.progress(pct_elapsed, text=f"{days_since_ping} / {st.session_state.grace_period} days elapsed")
-
-    if days_remaining <= 30:
-        st.warning(f"⚠️ **Action required:** You have {days_remaining} days to send your alive signal before inheritance is triggered.")
+    # How it works box
+    st.markdown("#### ⚙️ How WillChain Works")
+    st.markdown("""
+    <div style="background:white;border-radius:12px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,0.06)">
+      <div style="display:flex;gap:1rem;align-items:flex-start;margin-bottom:1rem">
+        <div style="background:#0D1B2A;color:#C9A84C;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">1</div>
+        <div><strong>Owner registers will on-chain</strong> — wallets, heirs, % allocation stored on Polygon blockchain</div>
+      </div>
+      <div style="display:flex;gap:1rem;align-items:flex-start;margin-bottom:1rem">
+        <div style="background:#0D1B2A;color:#C9A84C;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">2</div>
+        <div><strong>Upon death</strong> — heir or notary uploads the official death certificate to IPFS</div>
+      </div>
+      <div style="display:flex;gap:1rem;align-items:flex-start;margin-bottom:1rem">
+        <div style="background:#0D1B2A;color:#C9A84C;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">3</div>
+        <div><strong>Smart contract verifies</strong> the IPFS document hash and authenticity</div>
+      </div>
+      <div style="display:flex;gap:1rem;align-items:flex-start">
+        <div style="background:#3DBE7A;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">✓</div>
+        <div><strong>Assets transferred automatically</strong> to heirs' wallets — no bank, no court, no delay</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.divider()
 
@@ -400,46 +421,224 @@ elif page == "💰 Assets":
     chart_data = {a["token"]: a["value_usd"] for a in st.session_state.assets}
     st.bar_chart(chart_data)
 
-# ── ALIVE SIGNAL ─────────────────────────────────────────────────
-elif page == "🔔 Alive Signal":
-    days_since = (datetime.now() - st.session_state.last_ping).days
-    days_remaining = st.session_state.grace_period - days_since
+# ── DIGITAL VAULT ────────────────────────────────────────────────
+elif page == "🔐 Digital Vault":
+    st.markdown("### 🔐 Digital Vault — Secure Account Registry")
+    st.info("Store all your digital accounts, passwords and subscriptions here. Everything is **AES-256 encrypted** and stored on **IPFS** — only your heirs can decrypt it after your death certificate is verified.")
 
-    st.markdown("### 🔔 Alive Signal — Dead-Man's Switch")
+    # Stats
+    categories = list(set(v["category"] for v in st.session_state.vault_items))
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f"""<div class="metric-card">
+          <div class="metric-value">{len(st.session_state.vault_items)}</div>
+          <div class="metric-label">Accounts secured</div>
+        </div>""", unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"""<div class="metric-card">
+          <div class="metric-value">{len(categories)}</div>
+          <div class="metric-label">Categories</div>
+        </div>""", unsafe_allow_html=True)
+    with col3:
+        st.markdown(f"""<div class="metric-card">
+          <div class="metric-value">🔒</div>
+          <div class="metric-label">AES-256 Encrypted</div>
+        </div>""", unsafe_allow_html=True)
 
-    st.markdown(f"""
-    <div class="ping-btn-area">
-      <div style="font-size:3rem;margin-bottom:0.5rem">❤️</div>
-      <div style="font-size:1.3rem;font-weight:700;margin-bottom:0.3rem">I am alive.</div>
-      <div style="color:#8899AA;margin-bottom:1.5rem">
-        Last signal: <strong>{st.session_state.last_ping.strftime('%d %b %Y at %H:%M')}</strong> ({days_since} days ago)<br>
-        Next trigger in: <strong style="color:#C9A84C">{days_remaining} days</strong>
-      </div>
+    st.divider()
+
+    # How it works banner
+    st.markdown("""
+    <div style="background:#0D1B2A;border-radius:12px;padding:1.2rem 1.5rem;margin-bottom:1.2rem;color:white;font-size:0.9rem">
+      🔐 <strong style="color:#C9A84C">How your vault is protected:</strong>
+      Your passwords are encrypted with your wallet's public key → stored on IPFS →
+      only decryptable with your private key → released to heirs only after death certificate verification.
+      <strong>WillChain never sees your passwords.</strong>
     </div>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if st.button("✅  SEND ALIVE SIGNAL", use_container_width=True, type="primary"):
-            with st.spinner("Sending transaction to Polygon blockchain..."):
-                time.sleep(2)
-            st.session_state.last_ping = datetime.now()
-            st.session_state.ping_log.insert(0, datetime.now())
-            tx_hash = "0x" + "".join(random.choices("0123456789abcdef", k=40))
-            st.success(f"✅ Signal confirmed on-chain!\n\nTx: `{tx_hash}`\nBlock: #{random.randint(40000000, 50000000)}\nGas used: 0.00003 MATIC")
-            st.balloons()
-            time.sleep(1)
-            st.rerun()
+    # Filter by category
+    all_cats = ["All"] + sorted(list(set(v["category"] for v in st.session_state.vault_items)))
+    selected_cat = st.selectbox("Filter by category", all_cats)
 
-    # Ping history
-    st.markdown("#### 📅 Ping History")
-    for i, ping_date in enumerate(st.session_state.ping_log[:8]):
-        days_ago = (datetime.now() - ping_date).days
-        label = "Today" if days_ago == 0 else f"{days_ago} days ago"
-        st.markdown(f"""<div class="timeline-step">
-          {'🟢' if i == 0 else '⚪'} <strong>{ping_date.strftime('%d %B %Y — %H:%M')}</strong>
-          &nbsp;&nbsp;<span style="color:#888;font-size:0.85rem">{label}</span>
+    filtered = st.session_state.vault_items if selected_cat == "All" else [
+        v for v in st.session_state.vault_items if v["category"] == selected_cat
+    ]
+
+    # Display vault items
+    st.markdown("#### 🗄️ Secured Accounts")
+    for i, item in enumerate(filtered):
+        real_i = st.session_state.vault_items.index(item)
+        with st.expander(f"{item['category']}  **{item['name']}** — `{item['username']}`", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.text_input("Account name", item["name"], key=f"vname_{real_i}")
+                st.text_input("Username / Email", item["username"], key=f"vuser_{real_i}")
+            with col2:
+                st.text_input("Password", "••••••••••••", type="password", key=f"vpass_{real_i}",
+                              help="Stored encrypted — not visible even to WillChain")
+                cat_options = ["📧 Email", "🎬 Streaming", "☁️ Cloud Storage", "🏦 Finance",
+                               "🎮 Gaming", "💼 Work", "🛒 Shopping", "🔐 Other"]
+                st.selectbox("Category", cat_options,
+                             index=cat_options.index(item["category"]) if item["category"] in cat_options else 0,
+                             key=f"vcat_{real_i}")
+            st.text_area("Notes", item["note"], key=f"vnote_{real_i}", height=68)
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.markdown('<span class="status-active">🔒 Encrypted on IPFS</span>', unsafe_allow_html=True)
+            with col_b:
+                if st.button("🗑️ Remove", key=f"vdel_{real_i}"):
+                    st.session_state.vault_items.pop(real_i)
+                    st.rerun()
+
+    st.divider()
+
+    # Add new account
+    st.markdown("#### ➕ Add New Account")
+    with st.form("add_vault_item"):
+        col1, col2 = st.columns(2)
+        with col1:
+            new_vname = col1.text_input("Account name", placeholder="e.g. Gmail")
+            new_vuser = col1.text_input("Username / Email")
+        with col2:
+            new_vpass = col2.text_input("Password", type="password")
+            new_vcat = col2.selectbox("Category", [
+                "📧 Email", "🎬 Streaming", "☁️ Cloud Storage",
+                "🏦 Finance", "🎮 Gaming", "💼 Work", "🛒 Shopping", "🔐 Other"
+            ])
+        new_vnote = st.text_area("Notes (optional)", height=68)
+
+        if st.form_submit_button("🔐 Encrypt & Save to Vault", use_container_width=True):
+            if new_vname and new_vuser:
+                st.session_state.vault_items.append({
+                    "category": new_vcat,
+                    "name": new_vname,
+                    "username": new_vuser,
+                    "note": new_vnote,
+                    "encrypted": True
+                })
+                st.success(f"✅ {new_vname} encrypted and saved to your vault!")
+                st.rerun()
+            else:
+                st.error("Please fill in at least the account name and username.")
+
+    st.divider()
+
+    # Heir access preview
+    st.markdown("#### 👁️ Heir Access Preview")
+    st.caption("This is what your heirs see BEFORE death certificate verification:")
+    for item in st.session_state.vault_items[:3]:
+        st.markdown(f"""<div class="heir-card" style="opacity:0.6">
+          <div style="font-size:1.3rem">{item['category'].split()[0]}</div>
+          <div style="flex:1">
+            <div style="font-weight:600;color:#0D1B2A">{item['name']}</div>
+            <div style="font-size:0.8rem;color:#888">••••••••@••••••• · 🔒 Locked</div>
+          </div>
+          <div style="color:#E05252;font-size:0.8rem;font-weight:600">ENCRYPTED</div>
         </div>""", unsafe_allow_html=True)
+    st.caption("After verification → heirs receive the decryption key and see everything.")
+
+# ── DEATH CERTIFICATE ─────────────────────────────────────────────
+elif page == "📜 Death Certificate":
+    st.markdown("### 📜 Death Certificate — Inheritance Trigger")
+
+    tab_heir, tab_owner = st.tabs(["👤 Heir / Notary View", "ℹ️ How it works"])
+
+    with tab_heir:
+        st.info("This page is used by heirs or notaries to trigger the inheritance after the owner's death.")
+
+        if not st.session_state.certificate_verified:
+            st.markdown("#### Step 1 — Upload Death Certificate")
+            uploaded_file = st.file_uploader(
+                "Upload official death certificate (PDF or image)",
+                type=["pdf", "png", "jpg", "jpeg"],
+                help="The document will be encrypted and stored on IPFS. Only the hash is stored on-chain."
+            )
+
+            col1, col2 = st.columns(2)
+            with col1:
+                notary_name = st.text_input("Notary / Heir full name", placeholder="Me. Jean Dupont")
+                notary_role = st.selectbox("Role", ["Notary", "Heir", "Legal Representative", "Estate Lawyer"])
+            with col2:
+                notary_address = st.text_input("Your wallet address (0x...)", placeholder="0x...")
+                death_date = st.date_input("Date of death")
+
+            if uploaded_file and notary_name and notary_address:
+                st.markdown("#### Step 2 — Upload to IPFS & Submit to Smart Contract")
+
+                if st.button("📤 Upload to IPFS & Trigger Verification", type="primary", use_container_width=True):
+                    with st.status("Processing...", expanded=True) as status:
+                        st.write("🔐 Encrypting document...")
+                        time.sleep(0.8)
+                        ipfs_hash = "QmX" + "".join(random.choices("0123456789abcdefghijklmnopqrstuvwxyz", k=44))
+                        st.write(f"📦 Uploading to IPFS... Hash: `{ipfs_hash}`")
+                        time.sleep(1)
+                        st.write("⛓️ Submitting hash to WillChain smart contract on Polygon...")
+                        time.sleep(1)
+                        st.write("🔍 Smart contract verifying document authenticity...")
+                        time.sleep(1.2)
+                        st.session_state.certificate_uploaded = True
+                        st.session_state.certificate_hash = ipfs_hash
+                        status.update(label="✅ Certificate submitted successfully!", state="complete")
+
+                    st.success(f"✅ Document stored on IPFS and submitted to smart contract!\n\n**IPFS Hash:** `{ipfs_hash}`\n\n**Status:** Pending smart contract verification (simulated: ~30 seconds on testnet)")
+
+                    if st.button("✅ Simulate Smart Contract Verification", type="primary"):
+                        with st.spinner("Smart contract verifying..."):
+                            time.sleep(2)
+                        st.session_state.certificate_verified = True
+                        st.rerun()
+
+        else:
+            st.success("✅ Death certificate verified by smart contract!")
+            st.markdown(f"""
+            <div class="contract-box">
+            📜 CERTIFICATE VERIFIED<br>
+            ─────────────────────────────<br>
+            IPFS Hash:   {st.session_state.certificate_hash}<br>
+            Status:      ✅ VERIFIED ON-CHAIN<br>
+            Trigger:     🔴 INHERITANCE EXECUTING<br>
+            Network:     Polygon PoS<br>
+            ─────────────────────────────<br>
+            Assets transferring to {len(st.session_state.heirs)} heirs...
+            </div>
+            """, unsafe_allow_html=True)
+
+            total_value = sum(a["value_usd"] for a in st.session_state.assets)
+            st.markdown("#### 💸 Transfer Status")
+            for h in st.session_state.heirs:
+                heir_val = total_value * h["pct"] / 100
+                tx = "0x" + "".join(random.choices("0123456789abcdef", k=40))
+                st.success(f"✅ **{h['name']}** — ${heir_val:,.0f} sent → `{h['address']}` | Tx: `{tx[:20]}...`")
+
+            if st.button("🔄 Reset Demo"):
+                st.session_state.certificate_uploaded = False
+                st.session_state.certificate_verified = False
+                st.session_state.certificate_hash = None
+                st.rerun()
+
+    with tab_owner:
+        st.markdown("""
+        #### How the death certificate mechanism works
+
+        **For the owner (while alive):**
+        - Register your will on-chain once
+        - Designate your heirs and asset allocation
+        - No monthly action required — ever
+
+        **When the owner passes away:**
+        1. An heir or notary obtains the official death certificate
+        2. They upload it to this page — document is encrypted and stored on **IPFS**
+        3. The IPFS document hash is submitted to the **WillChain smart contract**
+        4. The smart contract verifies the document and **automatically transfers all assets** to heirs
+
+        **Why this is better than a monthly ping:**
+        - ✅ No burden on the owner while alive
+        - ✅ Legally grounded — uses official government documents
+        - ✅ Heirs are motivated to act — it's their inheritance
+        - ✅ Works anywhere in the world with an official death certificate
+        - ✅ Fully decentralized — no company can block the transfer
+        """)
 
 # ── SMART CONTRACT ───────────────────────────────────────────────
 elif page == "🔬 Smart Contract":
@@ -685,59 +884,86 @@ contract AssetTransfer is ReentrancyGuard {
 # ── DEMO SIMULATOR ───────────────────────────────────────────────
 elif page == "🎭 Demo Simulator":
     st.markdown("### 🎭 Inheritance Demo Simulator")
-    st.info("This demo simulates what happens when the grace period expires and inheritance is triggered. Perfect for live presentation.")
+    st.info("This demo simulates the full inheritance flow — from death certificate upload to automatic asset transfer. Perfect for live presentation.")
 
     total_value = sum(a["value_usd"] for a in st.session_state.assets)
 
-    st.markdown("#### Scenario Setup")
+    st.markdown("#### 📋 Scenario")
+    st.markdown("""
+    > **Jean Martin** has registered his crypto will on WillChain. He passes away.
+    > His daughter **Alice** obtains the official death certificate and triggers the inheritance.
+    """)
+
     col1, col2 = st.columns(2)
     with col1:
-        sim_days = st.slider("Simulate: days without ping", 0, 120, 95)
-        sim_grace = st.slider("Grace period set by owner (days)", 30, 120, 90)
+        st.markdown("""<div class="metric-card">
+          <div class="metric-value">$11,700</div>
+          <div class="metric-label">Assets to be transferred</div>
+        </div>""", unsafe_allow_html=True)
     with col2:
-        sim_days_remaining = sim_grace - sim_days
-        if sim_days_remaining > 0:
-            st.success(f"✅ Will is safe — {sim_days_remaining} days remaining")
-        else:
-            st.error(f"🔴 Grace period expired {abs(sim_days_remaining)} days ago — TRIGGER READY")
+        st.markdown("""<div class="metric-card">
+          <div class="metric-value">3</div>
+          <div class="metric-label">Heirs designated</div>
+        </div>""", unsafe_allow_html=True)
 
     st.divider()
+    st.markdown("#### 🎬 Run the Demo")
 
-    if sim_days_remaining <= 0:
-        st.markdown("#### 🚨 Inheritance Trigger Simulation")
-        if st.button("🚀 EXECUTE INHERITANCE TRIGGER", type="primary", use_container_width=True):
-            st.session_state.simulation_triggered = True
+    step = st.radio("Choose step to simulate:", [
+        "Step 1 — Heir uploads death certificate to IPFS",
+        "Step 2 — Smart contract verifies document",
+        "Step 3 — Assets automatically transferred to heirs",
+    ])
 
-        if st.session_state.simulation_triggered:
-            with st.status("Executing on-chain inheritance...", expanded=True) as status:
-                st.write("🔍 Verifying grace period elapsed...")
+    if step == "Step 1 — Heir uploads death certificate to IPFS":
+        if st.button("▶️ Simulate Step 1", type="primary", use_container_width=True):
+            with st.status("Uploading death certificate...", expanded=True) as status:
+                st.write("👤 Alice (heir) uploads official death certificate PDF...")
                 time.sleep(0.8)
-                st.write("📋 Reading WillRegistry — fetching heir list...")
+                st.write("🔐 Document encrypted with AES-256...")
                 time.sleep(0.8)
-                st.write("💸 Executing AssetTransfer.distributeNative()...")
+                ipfs_hash = "QmX7k9mNpLqR2sT4uV6wX8yZ0aB1cD3eF5gH7iJ9kL2mN4"
+                st.write(f"📦 Stored on IPFS: `{ipfs_hash}`")
+                time.sleep(0.8)
+                st.write("✅ IPFS hash submitted to WillChain smart contract")
+                status.update(label="✅ Step 1 complete!", state="complete")
+            st.success("Document is now permanently stored on IPFS — censorship resistant, forever accessible.")
+
+    elif step == "Step 2 — Smart contract verifies document":
+        if st.button("▶️ Simulate Step 2", type="primary", use_container_width=True):
+            with st.status("Smart contract verifying...", expanded=True) as status:
+                st.write("⛓️ WillChain contract reads IPFS hash...")
+                time.sleep(0.8)
+                st.write("🔍 Verifying document structure and authenticity...")
+                time.sleep(1)
+                st.write("📋 Cross-checking with registered will (owner: Jean Martin)...")
+                time.sleep(0.8)
+                st.write("✅ Document verified — triggering inheritance mode...")
+                status.update(label="✅ Step 2 complete — Inheritance triggered!", state="complete")
+            st.success("Smart contract confirmed the death certificate. No human intermediary involved.")
+
+    elif step == "Step 3 — Assets automatically transferred to heirs":
+        if st.button("🚀 SIMULATE FULL TRANSFER", type="primary", use_container_width=True):
+            with st.status("Executing transfers on Polygon...", expanded=True) as status:
+                st.write("💸 AssetTransfer.sol executing...")
                 time.sleep(0.8)
                 for h in st.session_state.heirs:
                     heir_val = total_value * h["pct"] / 100
-                    st.write(f"  ✅ Sent ${heir_val:,.0f} → {h['name']} ({h['address']})")
-                    time.sleep(0.5)
-                st.write("📝 Recording InheritanceTriggered event on Polygon...")
-                time.sleep(0.5)
-                st.write("🔒 Will marked as EXECUTED — immutable.")
-                status.update(label="✅ Inheritance executed successfully!", state="complete")
+                    tx = "0x" + "".join(random.choices("0123456789abcdef", k=40))
+                    st.write(f"  ✅ ${heir_val:,.0f} → {h['name']} ({h['address'][:12]}...) | Tx: {tx[:16]}...")
+                    time.sleep(0.6)
+                st.write("🔒 Will marked as EXECUTED on-chain — immutable.")
+                status.update(label="✅ All assets transferred!", state="complete")
 
-            st.success("🎉 All assets transferred automatically. No lawyer. No court. No delay. Pure smart contract.")
+            st.success("🎉 Inheritance complete. No bank. No court. No lawyer fees. Pure smart contract.")
+            st.balloons()
+
             st.markdown(f"""
-            | Heir | Allocation | Amount |
+            | Heir | Allocation | Amount Received |
             |---|---|---|
-            {''.join(f"| {h['name']} | {h['pct']}% | ${total_value*h['pct']/100:,.0f} |" for h in st.session_state.heirs)}
+            {''.join(f"| {h['name']} | {h['pct']}% | ${total_value*h['pct']/100:,.0f} |" + chr(10) for h in st.session_state.heirs)}
             """)
-            if st.button("🔄 Reset Simulation"):
-                st.session_state.simulation_triggered = False
-                st.rerun()
-    else:
-        st.markdown("#### 🟢 Will is Active")
-        st.markdown(f"Increase the 'days without ping' slider above {sim_grace} to simulate a trigger.")
 
 # ─── Footer ─────────────────────────────────────────────────────
 st.divider()
-st.caption("⛓️ WillChain · NEOMA MSc Fintech & DeFi · Final Group Project 2025–2026 · Built with Streamlit + Solidity")
+
