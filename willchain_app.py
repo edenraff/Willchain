@@ -319,7 +319,7 @@ elif page == "📝 My Will":
         Multi-sig:    {'Enabled' if multisig else 'Disabled'}<br>
         Status:       {'🟢 ACTIVE' if st.session_state.will_active else '🔴 INACTIVE'}<br>
         ─────────────────────────────<br>
-        Last Ping:    {st.session_state.last_ping.strftime('%Y-%m-%d %H:%M')}<br>
+        Trigger:      Death certificate verification<br>
         IPFS Hash:    QmX7k9...abc123<br>
         Contract:     0x9aB3...Fd2e (Polygon)
         </div>
