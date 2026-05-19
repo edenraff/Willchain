@@ -121,15 +121,8 @@ st.markdown("""
 # ─── Session State Init ──────────────────────────────────────────
 if "wallet_connected" not in st.session_state:
     st.session_state.wallet_connected = False
-if "vault_items" not in st.session_state:
-    st.session_state.vault_items = [
-        {"category": "📧 Email", "name": "Gmail", "username": "jean.martin@gmail.com", "note": "Main email account", "encrypted": True},
-        {"category": "🎬 Streaming", "name": "Netflix", "username": "jean.martin@gmail.com", "note": "Family plan", "encrypted": True},
-        {"category": "☁️ Cloud Storage", "name": "iCloud", "username": "jean.martin@icloud.com", "note": "Contains family photos", "encrypted": True},
-        {"category": "🏦 Finance", "name": "Revolut", "username": "jean.martin@gmail.com", "note": "Secondary bank account", "encrypted": True},
-        {"category": "🎮 Gaming", "name": "Steam", "username": "jeanmartin_gamer", "note": "Library of 200+ games", "encrypted": True},
-    ]
-
+if "grace_period" not in st.session_state:
+    st.session_state.grace_period = 90
 if "certificate_uploaded" not in st.session_state:
     st.session_state.certificate_uploaded = False
 if "certificate_hash" not in st.session_state:
@@ -183,7 +176,6 @@ with st.sidebar:
         "📝 My Will",
         "👥 Heirs",
         "💰 Assets",
-        "🔐 Digital Vault",
         "📜 Death Certificate",
         "🔬 Smart Contract",
         "🎭 Demo Simulator",
@@ -226,7 +218,7 @@ if page == "🏠 Dashboard":
     with col2:
         st.markdown(f"""<div class="metric-card">
           <div class="metric-value">${total_value:,.0f}</div>
-          <div class="metric-label">Total crypto assets</div>
+          <div class="metric-label">Total assets registered</div>
         </div>""", unsafe_allow_html=True)
     with col3:
         st.markdown(f"""<div class="metric-card">
@@ -235,8 +227,8 @@ if page == "🏠 Dashboard":
         </div>""", unsafe_allow_html=True)
     with col4:
         st.markdown(f"""<div class="metric-card">
-          <div class="metric-value">{len(st.session_state.vault_items)}</div>
-          <div class="metric-label">Digital accounts secured</div>
+          <div class="metric-value">{len(st.session_state.assets)}</div>
+          <div class="metric-label">Assets registered</div>
         </div>""", unsafe_allow_html=True)
 
     # How it works box
@@ -245,19 +237,19 @@ if page == "🏠 Dashboard":
     <div style="background:white;border-radius:12px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,0.06)">
       <div style="display:flex;gap:1rem;align-items:flex-start;margin-bottom:1rem">
         <div style="background:#0D1B2A;color:#C9A84C;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">1</div>
-        <div><strong>Owner registers will on-chain</strong> — wallets, heirs, % allocation stored on Polygon blockchain</div>
+        <div style="color:#1B2B3E"><strong>Owner registers will on-chain</strong> — wallets, heirs, % allocation stored on Polygon blockchain</div>
       </div>
       <div style="display:flex;gap:1rem;align-items:flex-start;margin-bottom:1rem">
         <div style="background:#0D1B2A;color:#C9A84C;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">2</div>
-        <div><strong>Upon death</strong> — heir or notary uploads the official death certificate to IPFS</div>
+        <div style="color:#1B2B3E"><strong>Upon death</strong> — heir or notary uploads the official death certificate to IPFS</div>
       </div>
       <div style="display:flex;gap:1rem;align-items:flex-start;margin-bottom:1rem">
         <div style="background:#0D1B2A;color:#C9A84C;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">3</div>
-        <div><strong>Smart contract verifies</strong> the IPFS document hash and authenticity</div>
+        <div style="color:#1B2B3E"><strong>Smart contract verifies</strong> the IPFS document hash and authenticity</div>
       </div>
       <div style="display:flex;gap:1rem;align-items:flex-start">
         <div style="background:#3DBE7A;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">✓</div>
-        <div><strong>Assets transferred automatically</strong> to heirs' wallets — no bank, no court, no delay</div>
+        <div style="color:#1B2B3E"><strong>Assets transferred automatically</strong> to heirs' wallets — no bank, no court, no delay</div>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -303,11 +295,10 @@ elif page == "📝 My Will":
     with col1:
         st.markdown("#### Settings")
         grace = st.slider("Grace period (days)", 30, 365, st.session_state.grace_period,
-                          help="Number of days without a ping before inheritance is triggered")
+                          help="Number of days after death certificate submission before transfer executes")
         st.session_state.grace_period = grace
 
-        ping_freq = st.selectbox("Ping reminder frequency", ["Weekly", "Monthly", "Every 2 weeks"])
-        notif_email = st.text_input("Notification email", placeholder="you@example.com")
+        notif_email = st.text_input("Notification email for heirs", placeholder="heir@example.com")
         multisig = st.checkbox("Require multi-heir confirmation (M-of-N)", value=False)
         if multisig:
             m = st.slider("Minimum confirmations required (M)", 1, len(st.session_state.heirs),
@@ -421,124 +412,7 @@ elif page == "💰 Assets":
     chart_data = {a["token"]: a["value_usd"] for a in st.session_state.assets}
     st.bar_chart(chart_data)
 
-# ── DIGITAL VAULT ────────────────────────────────────────────────
-elif page == "🔐 Digital Vault":
-    st.markdown("### 🔐 Digital Vault — Secure Account Registry")
-    st.info("Store all your digital accounts, passwords and subscriptions here. Everything is **AES-256 encrypted** and stored on **IPFS** — only your heirs can decrypt it after your death certificate is verified.")
-
-    # Stats
-    categories = list(set(v["category"] for v in st.session_state.vault_items))
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f"""<div class="metric-card">
-          <div class="metric-value">{len(st.session_state.vault_items)}</div>
-          <div class="metric-label">Accounts secured</div>
-        </div>""", unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""<div class="metric-card">
-          <div class="metric-value">{len(categories)}</div>
-          <div class="metric-label">Categories</div>
-        </div>""", unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"""<div class="metric-card">
-          <div class="metric-value">🔒</div>
-          <div class="metric-label">AES-256 Encrypted</div>
-        </div>""", unsafe_allow_html=True)
-
-    st.divider()
-
-    # How it works banner
-    st.markdown("""
-    <div style="background:#0D1B2A;border-radius:12px;padding:1.2rem 1.5rem;margin-bottom:1.2rem;color:white;font-size:0.9rem">
-      🔐 <strong style="color:#C9A84C">How your vault is protected:</strong>
-      Your passwords are encrypted with your wallet's public key → stored on IPFS →
-      only decryptable with your private key → released to heirs only after death certificate verification.
-      <strong>WillChain never sees your passwords.</strong>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Filter by category
-    all_cats = ["All"] + sorted(list(set(v["category"] for v in st.session_state.vault_items)))
-    selected_cat = st.selectbox("Filter by category", all_cats)
-
-    filtered = st.session_state.vault_items if selected_cat == "All" else [
-        v for v in st.session_state.vault_items if v["category"] == selected_cat
-    ]
-
-    # Display vault items
-    st.markdown("#### 🗄️ Secured Accounts")
-    for i, item in enumerate(filtered):
-        real_i = st.session_state.vault_items.index(item)
-        with st.expander(f"{item['category']}  **{item['name']}** — `{item['username']}`", expanded=False):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.text_input("Account name", item["name"], key=f"vname_{real_i}")
-                st.text_input("Username / Email", item["username"], key=f"vuser_{real_i}")
-            with col2:
-                st.text_input("Password", "••••••••••••", type="password", key=f"vpass_{real_i}",
-                              help="Stored encrypted — not visible even to WillChain")
-                cat_options = ["📧 Email", "🎬 Streaming", "☁️ Cloud Storage", "🏦 Finance",
-                               "🎮 Gaming", "💼 Work", "🛒 Shopping", "🔐 Other"]
-                st.selectbox("Category", cat_options,
-                             index=cat_options.index(item["category"]) if item["category"] in cat_options else 0,
-                             key=f"vcat_{real_i}")
-            st.text_area("Notes", item["note"], key=f"vnote_{real_i}", height=68)
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.markdown('<span class="status-active">🔒 Encrypted on IPFS</span>', unsafe_allow_html=True)
-            with col_b:
-                if st.button("🗑️ Remove", key=f"vdel_{real_i}"):
-                    st.session_state.vault_items.pop(real_i)
-                    st.rerun()
-
-    st.divider()
-
-    # Add new account
-    st.markdown("#### ➕ Add New Account")
-    with st.form("add_vault_item"):
-        col1, col2 = st.columns(2)
-        with col1:
-            new_vname = col1.text_input("Account name", placeholder="e.g. Gmail")
-            new_vuser = col1.text_input("Username / Email")
-        with col2:
-            new_vpass = col2.text_input("Password", type="password")
-            new_vcat = col2.selectbox("Category", [
-                "📧 Email", "🎬 Streaming", "☁️ Cloud Storage",
-                "🏦 Finance", "🎮 Gaming", "💼 Work", "🛒 Shopping", "🔐 Other"
-            ])
-        new_vnote = st.text_area("Notes (optional)", height=68)
-
-        if st.form_submit_button("🔐 Encrypt & Save to Vault", use_container_width=True):
-            if new_vname and new_vuser:
-                st.session_state.vault_items.append({
-                    "category": new_vcat,
-                    "name": new_vname,
-                    "username": new_vuser,
-                    "note": new_vnote,
-                    "encrypted": True
-                })
-                st.success(f"✅ {new_vname} encrypted and saved to your vault!")
-                st.rerun()
-            else:
-                st.error("Please fill in at least the account name and username.")
-
-    st.divider()
-
-    # Heir access preview
-    st.markdown("#### 👁️ Heir Access Preview")
-    st.caption("This is what your heirs see BEFORE death certificate verification:")
-    for item in st.session_state.vault_items[:3]:
-        st.markdown(f"""<div class="heir-card" style="opacity:0.6">
-          <div style="font-size:1.3rem">{item['category'].split()[0]}</div>
-          <div style="flex:1">
-            <div style="font-weight:600;color:#0D1B2A">{item['name']}</div>
-            <div style="font-size:0.8rem;color:#888">••••••••@••••••• · 🔒 Locked</div>
-          </div>
-          <div style="color:#E05252;font-size:0.8rem;font-weight:600">ENCRYPTED</div>
-        </div>""", unsafe_allow_html=True)
-    st.caption("After verification → heirs receive the decryption key and see everything.")
-
-# ── DEATH CERTIFICATE ─────────────────────────────────────────────
+# ── DEATH CERTIFICATE ────────────────────────────────────────────
 elif page == "📜 Death Certificate":
     st.markdown("### 📜 Death Certificate — Inheritance Trigger")
 
@@ -966,3 +840,4 @@ elif page == "🎭 Demo Simulator":
 
 # ─── Footer ─────────────────────────────────────────────────────
 st.divider()
+st.caption("⛓️ WillChain · NEOMA MSc Fintech & DeFi · Final Group Project 2025–2026 · Built with Streamlit + Solidity")
